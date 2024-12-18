@@ -10,7 +10,9 @@ export async function generateResponse(prompt: string) {
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    console.log(text);
+    return text;
   } catch (error) {
     console.error('Error in server action:', error);
     throw new Error('Failed to generate response');
