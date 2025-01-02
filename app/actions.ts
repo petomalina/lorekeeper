@@ -7,12 +7,25 @@ const modelName = 'gemini-exp-1206';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 const model = genAI.getGenerativeModel({ model: modelName });
 
-export async function generateResponse(prompt: string) {
+export async function generateResponse(prompt: string, history: Message[]) {
+  const historySimple = history.map(h => {
+    return {
+      role: h.user_id === null ? 'assistant' : 'user',
+      content: h.content,
+    }
+  });
+
+  const fullPrompt = `
+    You are a helpful assistant. You are currently in a chat with a user.
+
+    ${historySimple.map(h => `${h.role}: ${h.content}`).join('\n')}
+    User: ${prompt}
+  `;
+
   try {
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const text = response.text();
-    console.log(text);
     return text;
   } catch (error) {
     console.error('Error in server action:', error);
@@ -41,7 +54,9 @@ export async function sendMessage(chatId: number, userId: number, messageText: s
   }
 
   await db.prepare('INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)').run(chatId, messageText, userId);
-  const response = await generateResponse(messageText);
+  
+  const history = await loadChatMessages(chatId);
+  const response = await generateResponse(messageText, history);
   await db.prepare('INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)').run(chatId, response, null);
 
   return {
