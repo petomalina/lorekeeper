@@ -3,8 +3,9 @@
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Select } from "@/components/select";
+import { PlusIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
-import { generateResponse } from "../actions";
+import { sendMessage } from "../actions";
 import Markdown from 'react-markdown';
 
 export default function ChatPage() {
@@ -13,6 +14,10 @@ export default function ChatPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState('');
   const [knowledgeBases] = useState<Array<{ id: string; name: string }>>([]);
+
+  // tracks the chat id, if 0, then it's a new chat
+  const [chatId, setChatId] = useState(0);
+  const userId = 1;
 
   const scrollToBottom = () => {
     const messages = document.querySelectorAll('[data-message]');
@@ -39,13 +44,20 @@ export default function ChatPage() {
 
   const generateAIResponse = async (prompt: string) => {
     try {
-      const text = await generateResponse(prompt);
-      addMessage(text, 'assistant');
+      const { response, chatId: newChatId } = await sendMessage(chatId, userId, prompt);
+      addMessage(response, 'assistant');
+      setChatId(newChatId);
     } catch (error) {
       console.error('Error generating response:', error);
     } finally {
       setIsThinking(false);
     }
+  };
+
+  const handleNewChat = () => {
+    setChatId(0);
+    setMessages([]);
+    setInputValue('');
   };
 
   return (
@@ -81,11 +93,11 @@ export default function ChatPage() {
       <div className="border-t border-zinc-200 p-4 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <div className="flex gap-4">
           <Select
-            className="w-40"
+            className="w-44"
             onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
             value={selectedKnowledgeBase}
           >
-            <option value="">Knowledge</option>
+            <option value="">No knowledge base</option>
             {knowledgeBases.map((kb) => (
               <option key={kb.id} value={kb.id}>
                 {kb.name}
@@ -104,11 +116,17 @@ export default function ChatPage() {
             }}
           />
           <Button 
-            color="blue" 
             className="font-medium"
             onClick={handleSubmit}
           >
             Send
+          </Button>
+          <Button
+            onClick={handleNewChat}
+            plain
+            className="p-2 border-0"
+          >
+            <PlusIcon className="h-5 w-5" />
           </Button>
         </div>
       </div>
