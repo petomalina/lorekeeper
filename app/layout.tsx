@@ -4,8 +4,12 @@ import "./globals.css";
 import Image from 'next/image';
 import { SidebarLayout } from "@/components/sidebar-layout";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/navbar";
-import { Sidebar, SidebarSection, SidebarItem, SidebarBody, SidebarLabel } from "@/components/sidebar";
-import { ChatBubbleLeftRightIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { Sidebar, SidebarSection, SidebarItem, SidebarBody, SidebarLabel, SidebarHeading } from "@/components/sidebar";
+import { ChatBubbleLeftRightIcon, DocumentTextIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { deleteChat, getChats } from "./actions";
+import { Button } from "@/components/button";
+import { revalidatePath } from "next/cache";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -13,11 +17,23 @@ export const metadata: Metadata = {
   description: "Chat with AI",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const userId = 1;
+  const chats = await getChats(userId);
+
+  const deleteChatAction = async (formData: FormData) => {
+    'use server';
+    const chatId = formData.get('chatId');
+    if (chatId) {
+      await deleteChat(Number(chatId));
+      revalidatePath('/chat');
+    }
+  };
+
   const navbar = (
     <Navbar>
       <NavbarSpacer />
@@ -41,6 +57,30 @@ export default function RootLayout({
             <DocumentTextIcon data-slot="icon" />
             <SidebarLabel>Knowledge</SidebarLabel>
           </SidebarItem>
+        </SidebarSection>
+        <SidebarSection className="max-h-48 overflow-y-auto">
+          <SidebarHeading className="sticky top-0 z-10">Chats</SidebarHeading>
+          {chats.map((chat) => (
+            <SidebarItem key={chat.id} href={`/chat/${chat.id}`} className="group">
+              <span className="flex-1 text-xs">{chat.description}</span>
+              <form action={deleteChatAction}>
+                <input type="hidden" name="chatId" value={chat.id} />
+                <Button
+                  type="submit"
+                  className="invisible group-hover:visible"
+                  plain
+                >
+                  <TrashIcon className="h-4 w-4" data-slot="icon" />
+                </Button>
+              </form>
+            </SidebarItem>
+          ))}
+        </SidebarSection>
+        <SidebarSection className="max-h-48 overflow-y-auto">
+          <SidebarHeading className="sticky top-0 z-10">Knowledge</SidebarHeading>
+          {/* {knowledgeBases.map((kb) => (
+            <SidebarItem key={kb.id} href={`/knowledge/${kb.id}`}>{kb.name}</SidebarItem>
+          ))} */}
         </SidebarSection>
       </SidebarBody>
     </Sidebar>

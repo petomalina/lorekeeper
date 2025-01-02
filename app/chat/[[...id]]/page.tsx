@@ -5,16 +5,18 @@ import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message } from "../../actions";
+import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase } from "../../actions";
 import Markdown from 'react-markdown';
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 export default function ChatPage() {
+  const router = useRouter(); 
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState('');
-  const [knowledgeBases] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(0);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
 
   const { id } = useParams();
   const chatIdFromParams = id ? parseInt(id[0]) : 0;
@@ -29,9 +31,14 @@ export default function ChatPage() {
     }
 
     loadChatMessages(chatId).then((messages) => {
+      if (messages.length === 0) {
+        router.push('/chat');
+      }
       setMessages(messages);
+    }).catch((error) => {
+      console.error('Error loading chat messages:', error);
     });
-  }, [chatId]);
+  }, [chatId, router]);
 
   const scrollToBottom = () => {
     const messages = document.querySelectorAll('[data-message]');
@@ -65,7 +72,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId } = await sendMessage(chatId, userId, text);
+      const { response, chatId: newChatId } = await sendMessage(chatId, userId, selectedKnowledgeBase, text);
       addMessage({
         id: 0,
         chat_id: newChatId,
@@ -121,18 +128,19 @@ export default function ChatPage() {
       </div>
       <div className="border-t pt-4 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <div className="flex gap-4">
-          <Select
-            className="w-48"
-            onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
-            value={selectedKnowledgeBase}
+          <div className="w-60">
+            <Select
+              onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
+              value={selectedKnowledgeBase}
           >
-            <option value="">No Knowledge Base</option>
+            <option value="0">No Knowledge Base</option>
             {knowledgeBases.map((kb) => (
               <option key={kb.id} value={kb.id}>
                 {kb.name}
               </option>
-            ))}
-          </Select>
+              ))}
+            </Select>
+          </div>
           <Input
             placeholder="Type a message..."
             value={inputValue}
