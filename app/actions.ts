@@ -40,15 +40,28 @@ export async function sendMessage(chatId: number, userId: number, messageText: s
     chatId = newChat.lastInsertRowid as number;
   }
 
-  const message = await db.prepare('INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)').run(chatId, messageText, userId);
+  await db.prepare('INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)').run(chatId, messageText, userId);
   const response = await generateResponse(messageText);
   await db.prepare('INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)').run(chatId, response, null);
 
   return {
-    message,
     response,
     chatId,
   }
+}
+
+export interface Message {
+  id: number;
+  chat_id: number;
+  content: string;
+  user_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function loadChatMessages(chatId: number): Promise<Message[]> {
+  const messages = db.prepare('SELECT * FROM messages WHERE chat_id = ?').all(chatId);
+  return messages as Message[];
 }
 
 export async function getPrompts(userId: number) {
