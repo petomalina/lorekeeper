@@ -159,7 +159,9 @@ export async function sendMessage(
     try {
       const cleanedKnowledge = knowledge.replace(/```json\n?|```/g, '');
       parsedKnowledge = JSON.parse(cleanedKnowledge);
-      await createKnowledge(knowledgeBaseId, parsedKnowledge.knowledge, parsedKnowledge.source);
+      for (const knowledge of parsedKnowledge) {
+        await createKnowledge(knowledgeBaseId, knowledge.knowledge, knowledge.source);
+      }
     } catch (error) {
       console.error('Error parsing knowledge:', error);
     }
@@ -208,11 +210,38 @@ export async function getPrompts(userId: number) {
   return prompts;
 }
 
-export async function getKnowledgeBases(userId: number) {
-  const knowledgeBases = db
-    .prepare("SELECT * FROM knowledge_base WHERE user_id = ?")
-    .all(userId);
-  return knowledgeBases as KnowledgeBase[];
+export interface KnowledgeBase {
+  id: number;
+  user_id: number;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createKnowledgeBase(userId: number, name: string) {
+  const result = await db.prepare(
+    'INSERT INTO knowledge_base (user_id, name) VALUES (?, ?)'
+  ).run(userId, name);
+  
+  return result;
+}
+
+export async function getKnowledgeBases(userId: number): Promise<KnowledgeBase[]> {
+  const bases = await db.prepare(
+    'SELECT * FROM knowledge_base WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(userId);
+  
+  return bases as KnowledgeBase[];
+}
+
+export async function deleteKnowledgeBase(knowledgeBaseId: number) {
+  const knowledge = await db.prepare('DELETE FROM knowledge WHERE knowledge_base_id = ?').run(knowledgeBaseId);
+  const base = await db.prepare('DELETE FROM knowledge_base WHERE id = ?').run(knowledgeBaseId);
+  return {
+    knowledge,
+    base,
+  };
 }
 
 export async function getKnowledge(knowledgeBaseId: number) {
@@ -220,13 +249,6 @@ export async function getKnowledge(knowledgeBaseId: number) {
     .prepare("SELECT * FROM knowledge WHERE knowledge_base_id = ?")
     .all(knowledgeBaseId);
   return knowledge as Knowledge[];
-}
-
-export async function createKnowledgeBase(userId: number, name: string) {
-  const knowledgeBase = db
-    .prepare("INSERT INTO knowledge_base (user_id, name) VALUES (?, ?)")
-    .run(userId, name);
-  return knowledgeBase;
 }
 
 export async function createKnowledge(
@@ -240,14 +262,6 @@ export async function createKnowledge(
     )
     .run(knowledgeBaseId, knowledgeContent, source);
   return knowledge;
-}
-
-export interface KnowledgeBase {
-  id: number;
-  name: string;
-  user_id: number;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface Knowledge {

@@ -40,6 +40,12 @@ export default function ChatPage() {
     });
   }, [chatId, router]);
 
+  useEffect(() => {
+    getKnowledgeBases(userId).then((knowledgeBases) => {
+      setKnowledgeBases(knowledgeBases);
+    });
+  }, []);
+
   const scrollToBottom = () => {
     const messages = document.querySelectorAll('[data-message]');
     const lastMessage = messages[messages.length - 1];

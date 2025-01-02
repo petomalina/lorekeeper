@@ -6,7 +6,7 @@ import { SidebarLayout } from "@/components/sidebar-layout";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/navbar";
 import { Sidebar, SidebarSection, SidebarItem, SidebarBody, SidebarLabel, SidebarHeading } from "@/components/sidebar";
 import { ChatBubbleLeftRightIcon, DocumentTextIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { deleteChat, getChats } from "./actions";
+import { deleteChat, getChats, getKnowledgeBases } from "./actions";
 import { Button } from "@/components/button";
 import { revalidatePath } from "next/cache";
 
@@ -24,6 +24,7 @@ export default async function RootLayout({
 }>) {
   const userId = 1;
   const chats = await getChats(userId);
+  const knowledgeBases = await getKnowledgeBases(userId);
 
   const deleteChatAction = async (formData: FormData) => {
     'use server';
@@ -78,9 +79,9 @@ export default async function RootLayout({
         </SidebarSection>
         <SidebarSection className="max-h-48 overflow-y-auto">
           <SidebarHeading className="sticky top-0 z-10">Knowledge</SidebarHeading>
-          {/* {knowledgeBases.map((kb) => (
-            <SidebarItem key={kb.id} href={`/knowledge/${kb.id}`}>{kb.name}</SidebarItem>
-          ))} */}
+          {knowledgeBases.map((kb) => (
+            <SidebarItem key={kb.id} href={`/knowledge`}>{kb.name}</SidebarItem>
+          ))}
         </SidebarSection>
       </SidebarBody>
     </Sidebar>
