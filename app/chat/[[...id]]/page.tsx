@@ -5,7 +5,7 @@ import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase } from "../../actions";
+import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat } from "../../actions";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
 
@@ -17,6 +17,8 @@ export default function ChatPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(0);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [agent, setAgent] = useState<string>('base');
+  const [chat, setChat] = useState<Chat | null>(null);
 
   const { id } = useParams();
   const chatIdFromParams = id ? parseInt(id[0]) : 0;
@@ -29,6 +31,14 @@ export default function ChatPage() {
     if (chatId === 0) {
       return;
     }
+
+    getChat(chatId).then((chat) => {
+      setChat(chat);
+      setSelectedKnowledgeBase(chat.default_knowledge_base_id);
+      setAgent(chat.default_agent_name);
+    }).catch((error) => {
+      console.error('Error loading chat:', error);
+    });
 
     loadChatMessages(chatId).then((messages) => {
       if (messages.length === 0) {
@@ -78,7 +88,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId } = await sendMessage(chatId, userId, selectedKnowledgeBase, text);
+      const { response, chatId: newChatId } = await sendMessage(chatId, userId, selectedKnowledgeBase, text, agent);
       addMessage({
         id: 0,
         chat_id: newChatId,
@@ -137,7 +147,7 @@ export default function ChatPage() {
           <div className="w-60">
             <Select
               onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
-              value={selectedKnowledgeBase}
+              value={selectedKnowledgeBase || chat?.default_knowledge_base_id || 0}
           >
             <option value="0">No Knowledge Base</option>
             {knowledgeBases.map((kb) => (
@@ -145,6 +155,16 @@ export default function ChatPage() {
                 {kb.name}
               </option>
               ))}
+            </Select>
+          </div>
+          <div className="w-60">
+            <Select
+              onChange={(e) => setAgent(e.target.value)}
+              value={agent || chat?.default_agent_name || 'base'}
+            >
+              <option value="base">Base</option>
+              <option value="recruitingMentor">Recruiting Mentor</option>
+              <option value="businessCoach">Business Coach</option>
             </Select>
           </div>
           <Input

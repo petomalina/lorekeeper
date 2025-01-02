@@ -7,9 +7,10 @@ import { Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { useState } from "react";
 import { createKnowledgeBase } from "../actions";
-import { revalidatePath } from "next/cache";
+import { useRouter } from "next/navigation";
 
 export function CreateKnowledgeBaseForm() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
 
@@ -17,7 +18,7 @@ export function CreateKnowledgeBaseForm() {
     await createKnowledgeBase(1, name);
     setIsOpen(false);
     setName('');
-    revalidatePath('/knowledge');
+    router.refresh();
   };
 
   return (
