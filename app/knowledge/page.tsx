@@ -6,6 +6,7 @@ import { CreateKnowledgeBaseForm } from "./create-form";
 import { DescriptionDetails, DescriptionTerm } from "@/components/description-list";
 import React from "react";
 import { TrashIcon } from "@heroicons/react/24/outline";
+import { Button } from "@/components/button";
 
 export default async function KnowledgePage() {
   const userId = 1;
@@ -26,7 +27,7 @@ export default async function KnowledgePage() {
       <div className="mt-4 flex flex-col gap-2">
         {knowledgeBases.map((knowledgeBase) => (
           <Disclosure key={knowledgeBase.id} as="div" className="p-4 shadow rounded-lg bg-white/5">
-            <DisclosureButton className="group flex w-full items-center justify-between">
+            <DisclosureButton as="div" className="group flex w-full items-center justify-between cursor-pointer">
               <span className="text-sm/6 font-medium text-white group-data-[hover]:text-white/80">
                 {knowledgeBase.name}
               </span>
@@ -44,14 +45,13 @@ export default async function KnowledgePage() {
                     <DescriptionTerm className="flex items-center">
                       <form action={deleteKnowledgeAction}>
                         <input type="hidden" name="knowledgeId" value={knowledge.id} />
-                        <button type="submit" className="p-2 text-red-500 hover:text-red-400">
+                        <Button type="submit" plain className="mr-2">
                           <TrashIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </form>
                       {knowledge.knowledge}
                     </DescriptionTerm>
                     <DescriptionDetails>{knowledge.source}</DescriptionDetails>
-
                   </React.Fragment>
                 ))}
               </dl>
