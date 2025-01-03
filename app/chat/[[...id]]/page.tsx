@@ -5,19 +5,23 @@ import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat } from "../../actions";
+import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
+
+interface MessageWithKnowledge extends Message {
+  learnedKnowledge?: Knowledge[];
+}
 
 export default function ChatPage() {
   const router = useRouter(); 
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageWithKnowledge[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(0);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
-  const [agent, setAgent] = useState<string>('base');
+  const [agent, setAgent] = useState<'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor'>('base');
   const [chat, setChat] = useState<Chat | null>(null);
 
   const { id } = useParams();
@@ -35,7 +39,7 @@ export default function ChatPage() {
     getChat(chatId).then((chat) => {
       setChat(chat);
       setSelectedKnowledgeBase(chat.default_knowledge_base_id);
-      setAgent(chat.default_agent_name);
+      setAgent(chat.default_agent_name as 'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor');
     }).catch((error) => {
       console.error('Error loading chat:', error);
     });
@@ -62,7 +66,7 @@ export default function ChatPage() {
     lastMessage?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const addMessage = (msg: Message) => {
+  const addMessage = (msg: MessageWithKnowledge) => {
     setMessages(prev => {
       const newMessages = [...prev, msg];
       setTimeout(scrollToBottom, 0);
@@ -88,7 +92,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId } = await sendMessage(chatId, userId, selectedKnowledgeBase, text, agent);
+      const { response, chatId: newChatId, learnedKnowledge } = await sendMessage(chatId, userId, selectedKnowledgeBase, text, agent);
       addMessage({
         id: 0,
         chat_id: newChatId,
@@ -96,6 +100,7 @@ export default function ChatPage() {
         user_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        learnedKnowledge,
       });
       setChatId(newChatId);
     } catch (error) {
@@ -159,12 +164,13 @@ export default function ChatPage() {
           </div>
           <div className="w-60">
             <Select
-              onChange={(e) => setAgent(e.target.value)}
+              onChange={(e) => setAgent(e.target.value as 'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor')}
               value={agent || chat?.default_agent_name || 'base'}
             >
               <option value="base">Base</option>
               <option value="recruitingMentor">Recruiting Mentor</option>
               <option value="businessCoach">Business Coach</option>
+              <option value="infantMentor">Infant Mentor</option>
             </Select>
           </div>
           <Input
