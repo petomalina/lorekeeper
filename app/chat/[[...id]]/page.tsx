@@ -3,33 +3,36 @@
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Select } from "@/components/select";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
+import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge, AgentName } from "../../actions";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
+import { Switch } from "@/components/switch";
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/components/dropdown";
 
 interface MessageWithKnowledge extends Message {
   learnedKnowledge?: Knowledge[];
 }
 
 export default function ChatPage() {
-  const router = useRouter(); 
+  const router = useRouter();
 
   const [messages, setMessages] = useState<MessageWithKnowledge[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(0);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
-  const [agent, setAgent] = useState<'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor'>('base');
+  const [agent, setAgent] = useState<AgentName>('base');
   const [chat, setChat] = useState<Chat | null>(null);
+  const [shouldExtractKnowledge, setShouldExtractKnowledge] = useState(true);
 
   const { id } = useParams();
   const chatIdFromParams = id ? parseInt(id[0]) : 0;
 
   // tracks the chat id, if 0, then it's a new chat
   const [chatId, setChatId] = useState(chatIdFromParams);
-  const userId = 1;  
+  const userId = 1;
 
   useEffect(() => {
     if (chatId === 0) {
@@ -92,7 +95,14 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId, learnedKnowledge } = await sendMessage(chatId, userId, selectedKnowledgeBase, text, agent);
+      const { response, chatId: newChatId, learnedKnowledge } = await sendMessage(
+        chatId,
+        userId,
+        selectedKnowledgeBase,
+        text,
+        agent,
+        shouldExtractKnowledge
+      );
       addMessage({
         id: 0,
         chat_id: newChatId,
@@ -116,17 +126,40 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7.5rem)] lg:h-[calc(100vh-6rem)]">
+    <div className="flex flex-col h-[calc(100vh-7.5rem)] lg:h-[calc(100vh-6rem)] relative">
+      <div className="absolute top-0 left-0 z-10">
+        <Dropdown>
+          <DropdownButton plain>
+            <Cog8ToothIcon className="h-6 w-6" />
+          </DropdownButton>
+          <DropdownMenu>
+            <DropdownItem
+              href="#"
+              className="flex items-center justify-between gap-3" 
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShouldExtractKnowledge(!shouldExtractKnowledge);
+              }}
+            >
+              <Switch
+                checked={shouldExtractKnowledge}
+              />
+              <span className="text-sm">Extract Knowledge</span>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+
       <div className="flex-1 overflow-y-auto relative">
         {messages.map((message, index) => (
           <div
             key={index}
             data-message
-            className={`mb-4 rounded-lg p-4 ${
-              message.user_id === userId
-                ? 'ml-auto bg-blue-500 text-white'
-                : 'mr-auto bg-gray-100 dark:bg-zinc-800'
-            } max-w-[80%]`}
+            className={`mb-4 rounded-lg p-4 ${message.user_id === userId
+              ? 'ml-auto bg-blue-500 text-white'
+              : 'mr-auto bg-gray-100 dark:bg-zinc-800'
+              } max-w-[80%]`}
           >
             {message.user_id === userId ? (
               message.content
@@ -148,31 +181,30 @@ export default function ChatPage() {
         )}
       </div>
       <div className="border-t pt-4 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="flex gap-4">
-          <div className="w-60">
-            <Select
-              onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
-              value={selectedKnowledgeBase || chat?.default_knowledge_base_id || 0}
+        <div className="flex gap-4 items-center w-full">
+          <Select
+            className="w-60"
+            onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
+            value={selectedKnowledgeBase || chat?.default_knowledge_base_id || 0}
           >
             <option value="0">No Knowledge Base</option>
             {knowledgeBases.map((kb) => (
               <option key={kb.id} value={kb.id}>
                 {kb.name}
               </option>
-              ))}
-            </Select>
-          </div>
-          <div className="w-60">
-            <Select
-              onChange={(e) => setAgent(e.target.value as 'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor')}
-              value={agent || chat?.default_agent_name || 'base'}
-            >
-              <option value="base">Base</option>
-              <option value="recruitingMentor">Recruiting Mentor</option>
-              <option value="businessCoach">Business Coach</option>
-              <option value="infantMentor">Infant Mentor</option>
-            </Select>
-          </div>
+            ))}
+          </Select>
+          <Select
+            className="w-60"
+            onChange={(e) => setAgent(e.target.value as AgentName)}
+            value={agent || chat?.default_agent_name || 'base'}
+          >
+            <option value="base">Base</option>
+            <option value="businessCoach">Business Coach</option>
+            <option value="infantMentor">Infant Mentor</option>
+            <option value="securityMentor">Security Mentor</option>
+            <option value="recruitingMentor">Recruiting Mentor</option>
+          </Select>
           <Input
             placeholder="Type a message..."
             value={inputValue}
@@ -184,7 +216,7 @@ export default function ChatPage() {
               }
             }}
           />
-          <Button 
+          <Button
             className="font-medium"
             onClick={handleSubmit}
           >
