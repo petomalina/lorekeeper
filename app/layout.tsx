@@ -4,11 +4,13 @@ import "./globals.css";
 import Image from 'next/image';
 import { SidebarLayout } from "@/components/sidebar-layout";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/navbar";
-import { Sidebar, SidebarSection, SidebarItem, SidebarBody, SidebarLabel, SidebarHeading } from "@/components/sidebar";
-import { ChatBubbleLeftRightIcon, DocumentTextIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Sidebar, SidebarSection, SidebarItem, SidebarBody, SidebarLabel, SidebarHeading, SidebarHeader } from "@/components/sidebar";
+import { ChatBubbleLeftRightIcon, ChevronDownIcon, DocumentTextIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { deleteChat, getChats, getKnowledgeBases } from "./actions";
 import { Button } from "@/components/button";
 import { revalidatePath } from "next/cache";
+import { Dropdown, DropdownButton } from "@/components/dropdown";
+import { Avatar } from "@/components/avatar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -48,6 +50,15 @@ export default async function RootLayout({
 
   const sidebar = (
     <Sidebar>
+      <SidebarHeader>
+        <Dropdown>
+          <DropdownButton as={SidebarItem} className="lg:mb-2.5">
+            <Avatar src="/logo4.png" />
+            <SidebarLabel>Lorekeeper</SidebarLabel>
+            <ChevronDownIcon />
+          </DropdownButton>
+        </Dropdown>
+      </SidebarHeader>
       <SidebarBody>
         <SidebarSection>
           <SidebarItem href="/chat">

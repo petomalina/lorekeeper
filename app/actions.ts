@@ -2,6 +2,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import db from "@/lib/db";
+import { revalidatePath } from "next/cache";
 
 const modelName = "gemini-exp-1206";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
@@ -106,13 +107,12 @@ const agents = {
   Your task is to act as a virtual business coach for the user. You will engage in a dialogue to understand the user's business, their challenges, goals, and aspirations. You will provide guidance, support, and expert insights to help them improve their business performance, overcome obstacles, and achieve their desired outcomes. You will analyze the information provided by the user and leverage your extensive business acumen to offer tailored advice.
 
   ## Output
-  * Purpose: This section is where you actively engage in your role as a coach. You will guide the user through questions, reflections, and advice based on your expertise and the knowledge base observations.
+  * Purpose: This section is where you actively engage in your role as a coach. You will guide the user through questions, reflections, and advice based on your expertise.
   * Format:
       * Adopt a supportive and encouraging tone.
       * Ask open-ended questions to stimulate thought and encourage self-reflection.
       * Offer specific, actionable recommendations tailored to the user's situation.
       * Draw upon relevant business principles, frameworks, and examples.
-      * Reference and build upon the "Knowledge Base: Observations" section as appropriate.
       * Maintain the persona of a seasoned business coach throughout.
   * Example:
       * "Based on our conversation, it seems one of your key challenges is defining your target market. Let's explore that further. Who do you envision as your ideal customer?"
@@ -443,6 +443,18 @@ export async function deleteKnowledgeBase(knowledgeBaseId: number) {
   };
 }
 
+export async function deleteKnowledgeBaseAction(formData: FormData) {
+  const knowledgeBaseId = Number(formData.get('knowledgeBaseId'));
+  await deleteKnowledgeBase(knowledgeBaseId);
+  revalidatePath('/knowledge');
+}
+
+export async function deleteKnowledgeAction(formData: FormData) {
+  const knowledgeId = Number(formData.get('knowledgeId'));
+  await deleteKnowledge(knowledgeId);
+  revalidatePath('/knowledge');
+}
+
 export async function getKnowledge(knowledgeBaseId: number) {
   const knowledge = db
     .prepare("SELECT * FROM knowledge WHERE knowledge_base_id = ?")
@@ -455,12 +467,17 @@ export async function createKnowledge(
   knowledgeContent: string,
   source: string
 ) {
-  const knowledge = db
+  return db
     .prepare(
       "INSERT INTO knowledge (knowledge_base_id, knowledge, source) VALUES (?, ?, ?)"
     )
     .run(knowledgeBaseId, knowledgeContent, source);
-  return knowledge;
+}
+
+export async function deleteKnowledge(knowledgeId: number) {
+  return db
+    .prepare("DELETE FROM knowledge WHERE id = ?")
+    .run(knowledgeId);
 }
 
 export interface Knowledge {

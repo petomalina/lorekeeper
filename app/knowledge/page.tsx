@@ -1,10 +1,11 @@
 'use server';
 
-import { getKnowledge, getKnowledgeBases, Knowledge } from "../actions";
+import { getKnowledge, getKnowledgeBases, Knowledge, deleteKnowledgeAction, deleteKnowledgeBaseAction } from "../actions";
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
 import { CreateKnowledgeBaseForm } from "./create-form";
-import { DescriptionDetails, DescriptionList, DescriptionTerm } from "@/components/description-list";
+import { DescriptionDetails, DescriptionTerm } from "@/components/description-list";
 import React from "react";
+import { TrashIcon } from "@heroicons/react/24/outline";
 
 export default async function KnowledgePage() {
   const userId = 1;
@@ -22,23 +23,38 @@ export default async function KnowledgePage() {
         <h1 className="text-2xl font-bold">Knowledge Bases</h1>
         <CreateKnowledgeBaseForm />
       </div>
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col gap-2">
         {knowledgeBases.map((knowledgeBase) => (
           <Disclosure key={knowledgeBase.id} as="div" className="p-4 shadow rounded-lg bg-white/5">
             <DisclosureButton className="group flex w-full items-center justify-between">
               <span className="text-sm/6 font-medium text-white group-data-[hover]:text-white/80">
                 {knowledgeBase.name}
               </span>
+              <form action={deleteKnowledgeBaseAction}>
+                <input type="hidden" name="knowledgeBaseId" value={knowledgeBase.id} />
+                <button type="submit" className="p-2 text-red-500 hover:text-red-400">
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </form>
             </DisclosureButton>
             <DisclosurePanel className="mt-2 text-sm/5 text-white/50">
-              <DescriptionList>
+              <dl className="grid grid-cols-2 gap-2 text-left">
                 {knowledge[knowledgeBase.id].map((knowledge) => (
                   <React.Fragment key={knowledge.id}>
-                    <DescriptionTerm>{knowledge.knowledge}</DescriptionTerm>
+                    <DescriptionTerm className="flex items-center">
+                      <form action={deleteKnowledgeAction}>
+                        <input type="hidden" name="knowledgeId" value={knowledge.id} />
+                        <button type="submit" className="p-2 text-red-500 hover:text-red-400">
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </form>
+                      {knowledge.knowledge}
+                    </DescriptionTerm>
                     <DescriptionDetails>{knowledge.source}</DescriptionDetails>
+
                   </React.Fragment>
                 ))}
-              </DescriptionList>
+              </dl>
             </DisclosurePanel>
           </Disclosure>
         ))}
