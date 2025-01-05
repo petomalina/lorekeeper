@@ -135,7 +135,7 @@ export default function ChatPage() {
           <DropdownMenu>
             <DropdownItem
               href="#"
-              className="flex items-center justify-between gap-3" 
+              className="flex items-center justify-between gap-3"
               onClick={(e: React.MouseEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -182,29 +182,31 @@ export default function ChatPage() {
       </div>
       <div className="border-t pt-4 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <div className="flex gap-4 items-center w-full">
-          <Select
-            className="w-60"
-            onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
-            value={selectedKnowledgeBase || chat?.default_knowledge_base_id || 0}
-          >
-            <option value="0">No Knowledge Base</option>
-            {knowledgeBases.map((kb) => (
-              <option key={kb.id} value={kb.id}>
-                {kb.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            className="w-60"
-            onChange={(e) => setAgent(e.target.value as AgentName)}
-            value={agent || chat?.default_agent_name || 'base'}
-          >
-            <option value="base">Base</option>
-            <option value="businessCoach">Business Coach</option>
-            <option value="infantMentor">Infant Mentor</option>
-            <option value="securityMentor">Security Mentor</option>
-            <option value="recruitingMentor">Recruiting Mentor</option>
-          </Select>
+          <div className="w-60">
+            <Select
+              onChange={(e) => setSelectedKnowledgeBase(parseInt(e.target.value))}
+              value={selectedKnowledgeBase || chat?.default_knowledge_base_id || 0}
+            >
+              <option value="0">No Knowledge Base</option>
+              {knowledgeBases.map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="w-60">
+            <Select
+              onChange={(e) => setAgent(e.target.value as AgentName)}
+              value={agent || chat?.default_agent_name || 'base'}
+            >
+              <option value="base">Base</option>
+              <option value="businessCoach">Business Coach</option>
+              <option value="infantMentor">Infant Mentor</option>
+              <option value="securityMentor">Security Mentor</option>
+              <option value="recruitingMentor">Recruiting Mentor</option>
+            </Select>
+          </div>
           <Input
             placeholder="Type a message..."
             value={inputValue}

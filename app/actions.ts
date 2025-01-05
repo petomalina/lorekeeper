@@ -47,6 +47,35 @@ const agents = {
           ]
         If no new knowledge is found, output: []
   `,
+  compress: `
+    # Identity
+    You are a "Chat Compressor" AI. Your task is to condense a chronological chat history between a user and another AI agent into a single, concise paragraph. 
+
+    # Task
+    1. **Analyze the Chat:** Carefully examine the entire chat history, paying close attention to the user's questions, the agent's responses, and any key decisions or insights that emerged.
+    2. **Identify Key Information:** Extract the most important information from the conversation. Focus on:
+        * The user's primary goals or questions.
+        * The main topics discussed.
+        * Any significant conclusions, recommendations, or actions taken.
+    3. **Compress into Paragraph:**  Synthesize the key information into a clear, concise paragraph that accurately summarizes the conversation. 
+        * Maintain the chronological flow of the conversation in a general sense.
+        * Omit unnecessary details or repetitive information.
+        * Use clear and concise language.
+        * Ensure no valuable data is lost in the compression process.
+
+    # Input Format
+    The chat history will be provided in the following format:
+
+    \`\`\`
+    **Chat History (Chronological):**
+    [Timestamp] user: User's message
+    [Timestamp] assistant: Agent's response
+    ...
+    \`\`\`
+
+    # Output
+    A single paragraph summarizing the chat, preserving all valuable information.
+  `,
   recruitingMentor: `
   # Identity
 
@@ -120,12 +149,21 @@ const agents = {
   ${agentOutputFormat}
   
   # Example
-
-    * "Based on our conversation, it seems one of your key challenges is defining your target market. Let's explore that further. Who do you envision as your ideal customer?"
-    * "You mentioned revenue growth has plateaued. What strategies have you considered to address this?"
-    * "One observation I've made is that your team is highly motivated. How can you leverage this enthusiasm to drive innovation and growth?"
-    * "I've noticed that your current marketing efforts are concentrated on social media. Have you considered diversifying your marketing channels to reach a wider audience?"
-    * "It seems like an opportunity to revisit your pricing strategy. How could you optimize it to increase profitability without losing customers?"
+    BusinessCoach: "Based on our conversation, it seems one of your key challenges is defining your target market. Let's explore that further. Who do you envision as your ideal customer?"
+    User: "I'm targeting small businesses with less than 10 employees."
+    BusinessCoach: "That's a great start. What specific services or products do you offer?"
+    User: "We offer web development and digital marketing services."
+    BusinessCoach: "Excellent! How do you currently reach potential customers?"
+    User: "We use social media and content marketing."
+    BusinessCoach: "That's a good approach. Have you considered diversifying your marketing channels to reach a wider audience?"
+    User: "Yes, we're considering email marketing and paid advertising."
+    BusinessCoach: "That's a great strategy. What are your goals for the next quarter?"
+    User: "We want to increase our revenue by 20%."
+    BusinessCoach: "Based on our conversation, it seems one of your key challenges is defining your target market. Let's explore that further. Who do you envision as your ideal customer?"
+    User: "You mentioned revenue growth has plateaued. What strategies have you considered to address this?"
+    BusinessCoach: "One observation I've made is that your team is highly motivated. How can you leverage this enthusiasm to drive innovation and growth?"
+    User: "I've noticed that your current marketing efforts are concentrated on social media. Have you considered diversifying your marketing channels to reach a wider audience?"
+    BusinessCoach: "It seems like an opportunity to revisit your pricing strategy. How could you optimize it to increase profitability without losing customers?"
 
   # Guiding Principles
     * Context Awareness: Pay close attention to the information provided by the user in each turn of the conversation and tailor your responses accordingly.
@@ -241,26 +279,27 @@ export async function generateResponse(
     return {
       role: h.user_id === null ? "assistant" : "user",
       content: h.content,
+      timestamp: h.created_at
     };
   });
 
   const fullPrompt = `
-    ${agents[agent]}
+${agents[agent]}
 
-    ${historySimple.length && "**Chat History:**"}
-    ${historySimple.map((h) => `${h.role}: ${h.content}`).join("\n")}
-    
-    ${knowledge.length && "**Prior Knowledge (Initially Empty):**"}
-    ${knowledge.map((k) => `${k.knowledge}`).join("\n")}
-    
-    ${prompt ? `User: ${prompt}` : ""}
+${historySimple.length && "# Chat History (Chronological):"}
+  ${historySimple.map((h) => `[${h.timestamp}] ${h.role}: ${h.content}`).join("\n")}
+
+${knowledge.length && "# Current Knowledge (Initially Empty):"}
+  ${knowledge.map((k) => `[${k.created_at}] ${k.knowledge}`).join("\n")}
+
+${prompt && "# User Input:"}
+  ${prompt ? `User: ${prompt}` : ""}
   `;
 
   try {
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const text = response.text();
-    console.log(text);
     return text;
   } catch (error) {
     console.error("Error in server action:", error);
@@ -276,6 +315,7 @@ export interface Chat {
   updated_at: string;
   default_knowledge_base_id: number;
   default_agent_name: string;
+  last_uncompressed_message_id: number | null;
 }
 
 // getChats returns the chats for the user
@@ -389,6 +429,41 @@ export async function sendMessage(
     await updateChatDescription(chatId, summary);
   }
 
+  const chat = await getChat(chatId);
+  // count the uncompressed messages
+  const uncompressedMessages = await db.prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_id = ? AND user_id IS NOT NULL AND id > ?").get(chatId, chat.last_uncompressed_message_id || 0) as { count: number };
+
+  // Compress chat history if it's getting long (e.g., more than 30 messages)
+  if (uncompressedMessages.count > 20) {
+    const messagesToCompress = history.slice(0, -10); // Keep last 10 messages uncompressed
+    const startTime = messagesToCompress[0].created_at;
+    const endTime = messagesToCompress[messagesToCompress.length - 1].created_at;
+    const lastCompressedMessageId = messagesToCompress[messagesToCompress.length - 1].id;
+    
+    // Generate a compressed summary using the compress agent
+    const compressedSummary = await generateResponse(
+      "",
+      messagesToCompress,
+      [],
+      "compress"
+    );
+
+    await createCompressedChat(
+      chatId,
+      startTime,
+      endTime,
+      compressedSummary,
+      messagesToCompress.length
+    );
+
+    // Update the last_uncompressed_message_id in chats
+    await db
+      .prepare(
+        "UPDATE chats SET last_uncompressed_message_id = ? WHERE id = ?"
+      )
+      .run(lastCompressedMessageId, chatId);
+  }
+
   return {
     response,
     learnedKnowledge,
@@ -406,10 +481,35 @@ export interface Message {
 }
 
 export async function loadChatMessages(chatId: number): Promise<Message[]> {
-  const messages = db
-    .prepare("SELECT * FROM messages WHERE chat_id = ?")
-    .all(chatId);
-  return messages as Message[];
+  const chat = await getChat(chatId);
+  
+  // Get all compressed chat ranges
+  const compressedHistory = await getCompressedChats(chatId);
+  
+  // Get only uncompressed messages using the last_uncompressed_message_id
+  const activeMessages = db
+    .prepare(
+      `SELECT * FROM messages 
+       WHERE chat_id = ? 
+       AND (id > ? OR ? IS NULL)
+       ORDER BY created_at ASC`
+    )
+    .all(chatId, chat.last_uncompressed_message_id || 0, chat.last_uncompressed_message_id) as Message[];
+
+  // Convert compressed chats to message format
+  const compressedMessages: Message[] = compressedHistory.map(compressed => ({
+    id: -compressed.id, // Use negative IDs to avoid conflicts with real messages
+    chat_id: chatId,
+    content: `[Compressed History (${compressed.messages_count} messages): ${compressed.summary}]`,
+    user_id: null,
+    created_at: compressed.start_time,
+    updated_at: compressed.updated_at
+  }));
+
+  // Merge and sort all messages by timestamp
+  return [...compressedMessages, ...activeMessages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
 }
 
 export async function getPrompts(userId: number) {
@@ -497,4 +597,36 @@ export interface Knowledge {
   source: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface CompressedChat {
+  id: number;
+  chat_id: number;
+  start_time: string;
+  end_time: string;
+  summary: string;
+  messages_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createCompressedChat(
+  chatId: number,
+  startTime: string,
+  endTime: string,
+  summary: string,
+  messagesCount: number
+) {
+  return db
+    .prepare(
+      "INSERT INTO compressed_chats (chat_id, start_time, end_time, summary, messages_count) VALUES (?, ?, ?, ?, ?)"
+    )
+    .run(chatId, startTime, endTime, summary, messagesCount);
+}
+
+export async function getCompressedChats(chatId: number): Promise<CompressedChat[]> {
+  const compressedChats = db
+    .prepare("SELECT * FROM compressed_chats WHERE chat_id = ? ORDER BY start_time ASC")
+    .all(chatId);
+  return compressedChats as CompressedChat[];
 }
