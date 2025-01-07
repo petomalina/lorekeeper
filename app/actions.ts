@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import db from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { agents, AgentName } from "./agents";
+import fs from 'fs';
 
 const modelName = "gemini-exp-1206";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
@@ -23,20 +24,22 @@ export async function generateResponse(
     };
   });
 
-  const fullPrompt = `
-${agents[agent]}
+  const fullPrompt = `${agents[agent]}
 
-${historySimple.length && "# Chat History (Chronological):"}
-  ${historySimple.map((h) => `[${h.timestamp}] ${h.role}: ${h.content}`).join("\n")}
+${historySimple.length ? "# Chat History (Chronological):" : ""}
+${historySimple.map((h) => `[${h.timestamp}] ${h.role}: ${h.content}`).join("\n")}
 
-${knowledge.length && "# Current Knowledge (Initially Empty):"}
-  ${knowledge.map((k) => `[${k.created_at}] ${k.knowledge}`).join("\n")}
+${knowledge.length ? "# Current Knowledge (Initially Empty):" : ""}
+${knowledge.map((k) => `[${k.created_at}] ${k.knowledge}`).join("\n")}
 
-${prompt && "# User Input:"}
-  ${prompt ? `User: ${prompt}` : ""}
-  `;
+${prompt ? "# User Input:" : ""}
+${prompt ? `User: ${prompt}` : ""}`;
 
-  console.log(fullPrompt);
+  const timestamp = new Date().toISOString();
+  const fileName = `prompt_history/${timestamp}.txt`;
+  const fileContent = fullPrompt;
+
+  await fs.promises.writeFile(fileName, fileContent);
 
   try {
     const result = await model.generateContent(fullPrompt);
@@ -149,6 +152,7 @@ export async function sendMessage(
       const cleanedKnowledge = knowledge.replace(/```json\n?|```/g, '');
       parsedKnowledge = JSON.parse(cleanedKnowledge);
       for (const knowledge of parsedKnowledge) {
+        console.log("New knowledge extracted:", knowledge);
         await createKnowledge(knowledgeBaseId, knowledge.knowledge, knowledge.source);
       }
       learnedKnowledge.push(...parsedKnowledge);
@@ -159,7 +163,7 @@ export async function sendMessage(
 
   const knowledge = await getKnowledge(knowledgeBaseId);
   const response = await generateResponse(messageText, history, knowledge, agent);
-
+  console.log("Response:", response);
   await db
     .prepare(
       "INSERT INTO messages (chat_id, content, user_id) VALUES (?, ?, ?)"

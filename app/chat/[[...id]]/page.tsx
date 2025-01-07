@@ -5,7 +5,8 @@ import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { PlusIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge, AgentName } from "../../actions";
+import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
+import { AgentName } from "../../agents";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
 import { Switch } from "@/components/switch";
@@ -42,7 +43,7 @@ export default function ChatPage() {
     getChat(chatId).then((chat) => {
       setChat(chat);
       setSelectedKnowledgeBase(chat.default_knowledge_base_id);
-      setAgent(chat.default_agent_name as 'base' | 'recruitingMentor' | 'businessCoach' | 'infantMentor');
+      setAgent(chat.default_agent_name as AgentName);
     }).catch((error) => {
       console.error('Error loading chat:', error);
     });
@@ -205,6 +206,7 @@ export default function ChatPage() {
               <option value="infantMentor">Infant Mentor</option>
               <option value="securityMentor">Security Mentor</option>
               <option value="recruitingMentor">Recruiting Mentor</option>
+              <option value="leadershipCoach">Leadership Coach</option>
             </Select>
           </div>
           <Input
