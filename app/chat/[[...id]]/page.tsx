@@ -5,7 +5,7 @@ import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { PlusIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
+import { loadChatMessages, sendUserMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
 import { AgentName } from "../../agents";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
@@ -96,7 +96,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId, learnedKnowledge } = await sendMessage(
+      const { response, chatId: newChatId, learnedKnowledge } = await sendUserMessage(
         chatId,
         userId,
         selectedKnowledgeBase,
