@@ -158,7 +158,7 @@ export default function ChatPage() {
             key={index}
             data-message
             className={`mb-4 rounded-lg p-4 ${message.user_id === userId
-              ? 'ml-auto bg-blue-500 text-white'
+              ? 'ml-auto bg-blue-600/75 text-white'
               : 'mr-auto bg-gray-100 dark:bg-zinc-800'
               } max-w-[80%]`}
           >
