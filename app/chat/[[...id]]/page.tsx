@@ -53,6 +53,7 @@ export default function ChatPage() {
         router.push('/chat');
       }
       setMessages(messages);
+      setTimeout(scrollToBottom, 0);
     }).catch((error) => {
       console.error('Error loading chat messages:', error);
     });
@@ -70,10 +71,16 @@ export default function ChatPage() {
     lastMessage?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Add effect to scroll when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages]);
+
   const addMessage = (msg: MessageWithKnowledge) => {
     setMessages(prev => {
       const newMessages = [...prev, msg];
-      setTimeout(scrollToBottom, 0);
       return newMessages;
     });
   };
