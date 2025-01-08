@@ -130,11 +130,11 @@ export async function sendUserMessage(
       const newKnowledge = await generatePromptResponse(prompt);
       const cleanedKnowledge = newKnowledge.replace(/```json\n?|```/g, '');
       learnedKnowledge = JSON.parse(cleanedKnowledge);
-      for (const knowledge of learnedKnowledge) {
-        console.log("New knowledge extracted:", knowledge);
-        await createKnowledge(knowledgeBaseId, knowledge.knowledge, knowledge.source);
+      for (const k of learnedKnowledge) {
+        console.log("New knowledge extracted:", k);
+        await createKnowledge(knowledgeBaseId, k.knowledge, k.source);
         // push to the current instance of knowledge so we can put it into the prompt later
-        knowledge.push(knowledge);
+        knowledge.push(k);
       }
     } catch (error) {
       console.error('Error parsing knowledge:', error);
