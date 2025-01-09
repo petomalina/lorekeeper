@@ -9,6 +9,8 @@ import fs from 'fs';
 const modelName = "gemini-exp-1206";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 const model = genAI.getGenerativeModel({ model: modelName });
+const jsonModel = genAI.getGenerativeModel({ model: modelName });
+jsonModel.generationConfig.responseMimeType = "application/json";
 
 export async function generatePromptResponse(prompt: string) {
   // save the prompt to a file for later inspection
@@ -16,9 +18,27 @@ export async function generatePromptResponse(prompt: string) {
   const fileName = `prompt_history/${timestamp}.txt`;
   await fs.promises.writeFile(fileName, prompt);
 
-  // call the generative model
-  const result = await model.generateContent(prompt);
+  const [result, tokenCount] = await Promise.all([
+    model.generateContent(prompt),
+    model.countTokens(prompt)
+  ]);
+
+  return {
+    response: result.response.text(),
+    tokenCount: tokenCount.totalTokens,
+  };
+}
+
+// generatePromptResponseJson generates a response from the model in JSON format
+export async function generatePromptResponseJson(prompt: string) {
+  const result = await jsonModel.generateContent(prompt);
   return result.response.text();
+}
+
+// promptTokenCount counts the tokens in a prompt
+export async function promptTokenCount(prompt: string) {
+  const result = await model.countTokens(prompt);
+  return result;
 }
 
 export interface Chat {
@@ -128,10 +148,9 @@ export async function sendUserMessage(
 
     try {
       const newKnowledge = await generatePromptResponse(prompt);
-      const cleanedKnowledge = newKnowledge.replace(/```json\n?|```/g, '');
+      const cleanedKnowledge = newKnowledge.response.replace(/```json\n?|```/g, '');
       learnedKnowledge = JSON.parse(cleanedKnowledge);
       for (const k of learnedKnowledge) {
-        console.log("New knowledge extracted:", k);
         await createKnowledge(knowledgeBaseId, k.knowledge, k.source);
         // push to the current instance of knowledge so we can put it into the prompt later
         knowledge.push(k);
@@ -159,10 +178,9 @@ export async function sendUserMessage(
   }
   prompt += `\n\n# User Message:\n${messageText}`
   const response = await generatePromptResponse(prompt);
-  console.log("Response:", response);
 
   // create the response message
-  await createMessage(chatId, response, null);
+  await createMessage(chatId, response.response, null);
 
   // summarize the chat when the first 6 messages were sent back and forth
   if (history.length === 6) {
@@ -171,7 +189,7 @@ export async function sendUserMessage(
     prompt += `\n${history.map((h) => `[${h.created_at}] ${h.user_id ? "User" : "Assistant"}: ${h.content}`).join("\n")}`
 
     const summary = await generatePromptResponse(prompt);
-    await updateChatDescription(chatId, summary);
+    await updateChatDescription(chatId, summary.response);
   }
 
   // count the uncompressed messages, the chat has a field called last_uncompressed_message_id
@@ -204,7 +222,7 @@ export async function sendUserMessage(
       chatId,
       startTime,
       endTime,
-      compressedSummary,
+      compressedSummary.response,
       messagesToCompress.length
     );
 
@@ -218,6 +236,7 @@ export async function sendUserMessage(
 
   return {
     response,
+    tokenCount: response.tokenCount,
     learnedKnowledge,
     chatId,
   };

@@ -1,9 +1,8 @@
 'use client';
 
 import { Button } from "@/components/button";
-import { Input } from "@/components/input";
 import { Select } from "@/components/select";
-import { PlusIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, Cog8ToothIcon, ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { loadChatMessages, sendUserMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
 import { AgentName } from "../../agents";
@@ -11,6 +10,7 @@ import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
 import { Switch } from "@/components/switch";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/components/dropdown";
+import { Textarea } from "@/components/textarea";
 
 interface MessageWithKnowledge extends Message {
   learnedKnowledge?: Knowledge[];
@@ -27,7 +27,7 @@ export default function ChatPage() {
   const [agent, setAgent] = useState<AgentName>('base');
   const [chat, setChat] = useState<Chat | null>(null);
   const [shouldExtractKnowledge, setShouldExtractKnowledge] = useState(true);
-
+  const [tokenCount, setTokenCount] = useState<number>(0);
   const { id } = useParams();
   const chatIdFromParams = id ? parseInt(id[0]) : 0;
 
@@ -103,7 +103,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, chatId: newChatId, learnedKnowledge } = await sendUserMessage(
+      const { response, tokenCount, chatId: newChatId, learnedKnowledge } = await sendUserMessage(
         chatId,
         userId,
         selectedKnowledgeBase,
@@ -111,10 +111,11 @@ export default function ChatPage() {
         agent,
         shouldExtractKnowledge
       );
+      setTokenCount(tokenCount);
       addMessage({
         id: 0,
         chat_id: newChatId,
-        content: response,
+        content: response.response,
         user_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -154,6 +155,12 @@ export default function ChatPage() {
                 checked={shouldExtractKnowledge}
               />
               <span className="text-sm">Extract Knowledge</span>
+            </DropdownItem>
+            <DropdownItem className="flex items-center justify-between gap-3">
+              <span className="flex justify-center">
+                <ChatBubbleLeftEllipsisIcon className="h-4 w-4" />
+              </span>
+              <span className="text-sm">Number of tokens: {tokenCount}</span>
             </DropdownItem>
           </DropdownMenu>
         </Dropdown>
@@ -216,16 +223,17 @@ export default function ChatPage() {
               <option value="leadershipCoach">Leadership Coach</option>
             </Select>
           </div>
-          <Input
+          <Textarea
             placeholder="Type a message..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 handleSubmit();
               }
             }}
+            className="resize-none h-10 min-h-10 max-h-12"
           />
           <Button
             className="font-medium"
