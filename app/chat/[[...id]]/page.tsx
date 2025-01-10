@@ -11,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Switch } from "@/components/switch";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/components/dropdown";
 import { Textarea } from "@/components/textarea";
+import remarkGfm from 'remark-gfm';
 
 interface MessageWithKnowledge extends Message {
   learnedKnowledge?: Knowledge[];
@@ -180,6 +181,7 @@ export default function ChatPage() {
               message.content
             ) : (
               <Markdown
+                remarkPlugins={[remarkGfm]}
                 className="prose dark:prose-invert prose-zinc max-w-none"
               >
                 {message.content}
@@ -221,6 +223,7 @@ export default function ChatPage() {
               <option value="securityMentor">Security Mentor</option>
               <option value="recruitingMentor">Recruiting Mentor</option>
               <option value="leadershipCoach">Leadership Coach</option>
+              <option value="execSpeak">Exec Speak</option>
             </Select>
           </div>
           <Textarea
