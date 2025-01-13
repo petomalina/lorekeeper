@@ -12,6 +12,7 @@ import { Switch } from "@/components/switch";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/components/dropdown";
 import { Textarea } from "@/components/textarea";
 import remarkGfm from 'remark-gfm';
+import clsx from "clsx";
 
 interface MessageWithKnowledge extends Message {
   learnedKnowledge?: Knowledge[];
@@ -177,16 +178,12 @@ export default function ChatPage() {
               : 'mr-auto bg-gray-100 dark:bg-zinc-800'
               } max-w-[80%]`}
           >
-            {message.user_id === userId ? (
-              message.content
-            ) : (
-              <Markdown
-                remarkPlugins={[remarkGfm]}
-                className="prose dark:prose-invert prose-zinc max-w-none"
-              >
-                {message.content}
-              </Markdown>
-            )}
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              className={clsx(message.user_id !== userId && "prose dark:prose-invert prose-zinc max-w-none")}
+            >
+              {message.content}
+            </Markdown>
           </div>
         ))}
         {isThinking && (
