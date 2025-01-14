@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/button";
 import { Select } from "@/components/select";
-import { PlusIcon, Cog8ToothIcon, ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
+import { Cog8ToothIcon, ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { loadChatMessages, sendUserMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
 import { AgentName } from "../../agents";
@@ -131,11 +131,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleNewChat = () => {
-    setMessages([]);
-    setInputValue('');
-  };
-
   return (
     <div className="flex flex-col h-[calc(100vh-7.5rem)] lg:h-[calc(100vh-6rem)] relative">
       <div className="absolute top-0 left-0 z-10">
@@ -238,17 +233,11 @@ export default function ChatPage() {
             className="resize-none h-10 min-h-10 max-h-12"
           />
           <Button
-            className="font-medium"
+            className="font-medium w-32"
+            outline
             onClick={handleSubmit}
           >
             Send
-          </Button>
-          <Button
-            onClick={handleNewChat}
-            plain
-            className="p-2 border-0"
-          >
-            <PlusIcon className="h-5 w-5" />
           </Button>
         </div>
       </div>
