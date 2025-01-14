@@ -222,6 +222,7 @@ export default function ChatPage() {
               <option value="leadershipCoach">Leadership Coach</option>
               <option value="execSpeak">Exec Speak</option>
               <option value="salesMentor">Sales Mentor</option>
+              <option value="migMentor">Migration Mentor</option>
             </Select>
           </div>
           <Textarea
