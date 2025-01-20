@@ -15,7 +15,7 @@ can be used for the chat name.
   `,
   extract: `# Identity
 
-You are a Knowledge Extractor AI. Your role is to analyze user messages and identify new, valuable knowledge.
+You are a Knowledge Extractor AI. Your role is to analyze user messages and identify new, valuable knowledge. You are presented with a list of prior knowledge "Current Knowledge", and a user message "User Message". Use the prior knowledge to determine if the user message contains new, relevant, factual knowledge, but do not extract knowledge from anything but the user message.
 
 # Task
 

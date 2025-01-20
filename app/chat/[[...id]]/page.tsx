@@ -4,7 +4,7 @@ import { Button } from "@/components/button";
 import { Select } from "@/components/select";
 import { Cog8ToothIcon, ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { loadChatMessages, sendUserMessage, Message, getKnowledgeBases, KnowledgeBase, getChat, Chat, Knowledge } from "../../actions";
+import { loadChatMessages, sendUserMessage, getKnowledgeBases, KnowledgeBase, getChat, Chat } from "../../actions";
 import { AgentName } from "../../agents";
 import Markdown from 'react-markdown';
 import { useParams, useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/componen
 import { Textarea } from "@/components/textarea";
 import remarkGfm from 'remark-gfm';
 import clsx from "clsx";
+import { Message, Knowledge } from "@/app/agentchain";
 
 interface MessageWithKnowledge extends Message {
   learnedKnowledge?: Knowledge[];
@@ -105,7 +106,7 @@ export default function ChatPage() {
 
   const generateAIResponse = async (text: string) => {
     try {
-      const { response, tokenCount, chatId: newChatId, learnedKnowledge } = await sendUserMessage(
+      const { result, tokenCount, chatId: newChatId } = await sendUserMessage(
         chatId,
         userId,
         selectedKnowledgeBase,
@@ -117,11 +118,10 @@ export default function ChatPage() {
       addMessage({
         id: 0,
         chat_id: newChatId,
-        content: response.response,
+        content: result as string,
         user_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        learnedKnowledge,
       });
       setChatId(newChatId);
     } catch (error) {

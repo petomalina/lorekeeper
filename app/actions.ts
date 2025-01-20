@@ -5,6 +5,7 @@ import db from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { agents, AgentName } from "./agents";
 import fs from 'fs';
+import { AgentChainConfig, compressChainPart, executeAgentChain, extractChainPart, Knowledge, Message, processMessageChainPart, summarizeChainPart } from "./agentchain";
 
 const modelName = "gemini-exp-1206";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
@@ -126,129 +127,76 @@ export async function sendUserMessage(
   }
 
   const chat = await getChat(chatId);
-
-  // create the message that the user sent
-  await createMessage(chatId, messageText, userId);
-
   // set the defaults if they're not already set
   if (chat.default_knowledge_base_id != knowledgeBaseId || chat.default_agent_name != agent) { 
     await updateChatDefaults(chatId, knowledgeBaseId, agent);
   }
 
-  // get the current knowledge
-  const knowledge = await getKnowledge(knowledgeBaseId);
-  let learnedKnowledge = [];
+  // construct the chain
+  const parts = [];
+  if (shouldExtractKnowledge) {
+    parts.push(extractChainPart("extract"));
+  }
+  parts.push(summarizeChainPart("summarize", 6));
+  parts.push(processMessageChainPart("process_message", agent));
+  parts.push(compressChainPart("compress", 50, 20));
 
-  // extract new knowledge
-  if (knowledgeBaseId && shouldExtractKnowledge) {
-    let prompt = `${agents['extract']}`;
+  const chain: AgentChainConfig = {
+    name: "process_message",
+    parts,
+    progress: new Map(),
+    getKnowledge: async () => {
+      return await getKnowledge(knowledgeBaseId);
+    },
+    createKnowledge: async (knowledge: Knowledge) => {
+      await createKnowledge(knowledgeBaseId, knowledge.knowledge, knowledge.source);
+    },
+    getMessages: async () => {
+      const compressedHistory = await getCompressedChats(chatId);
+      const history = await getMessagesFromId(chatId, chat.last_uncompressed_message_id || 0);
+      const messages = [
+        ...compressedHistory.map((h) => ({
+          ...h,
+          id: -h.id,
+          user_id: null,
+          chat_id: chatId,
+          content: `[Compressed History (${h.messages_count} messages)]: ${h.summary}`,
+          is_compressed: true,
+        } as Message)),
+        ...history,
+      ];
 
-    prompt += `\n\n# Current Knowledge:\n${knowledge.map((k) => `[${k.created_at}] ${k.knowledge}`).join("\n")}`
-    prompt += `\n\n# User Message:\n${messageText}`
-
-    try {
-      const newKnowledge = await generatePromptResponse(prompt);
-      const cleanedKnowledge = newKnowledge.response.replace(/```json\n?|```/g, '');
-      learnedKnowledge = JSON.parse(cleanedKnowledge);
-      for (const k of learnedKnowledge) {
-        await createKnowledge(knowledgeBaseId, k.knowledge, k.source);
-        // push to the current instance of knowledge so we can put it into the prompt later
-        knowledge.push(k);
+      return messages;
+    },
+    generatePromptResponse: async (prompt: string) => {
+      const result = await generatePromptResponse(prompt);
+      return {
+        response: result.response,
+        tokenCount: result.tokenCount,
+      };
+    },
+    updateDescription: async (description: string) => {
+      await updateChatDescription(chatId, description);
+    },
+    updateLastUncompressedMessageId: async (lastUncompressedMessageId: number) => {
+      await updateChatLastUncompressedMessageId(chatId, lastUncompressedMessageId);
+    },
+    createMessage: async (message: Message, type: "user" | "assistant" | "compressed") => {
+      if (type === "compressed") {
+        await createCompressedChat(chatId, message.created_at!, message.created_at!, message.content, message.messages_count!);
+      } else {
+        await createMessage(chatId, message.content, type === "user" ? userId : null);
       }
-    } catch (error) {
-      console.error('Error parsing knowledge:', error);
-    }
+    },
   }
 
-  const compressedHistory = await getCompressedChats(chatId);
-  // get the current history of the chat, starting at the last uncompressed message
-  const history = await getMessagesFromId(chatId, chat.last_uncompressed_message_id || 0);
-
-  // generate the prompt for the actual agent the user is trying to talk to
-  let prompt = `${agents[agent]}\n\n`;
-  if (history.length > 0) {
-    prompt += `# Chat History (Chronological, chats prefixed with 'Summarized' are compressed longer messages between user and the assistant):`
-    if (compressedHistory.length > 0) {
-      prompt += `\n${compressedHistory.map((h) => `[${h.start_time} - ${h.end_time}] Summarized: ${h.summary}`).join("\n")}`
-    }
-    prompt += `\n${history.map((h) => `[${h.created_at}] ${h.user_id ? "User" : "Assistant"}: ${h.content}`).join("\n")}`
-  }
-  if (knowledge.length > 0) {
-    prompt += `\n\n# Current Knowledge:\n${knowledge.map((k) => `[${k.created_at}] ${k.knowledge}`).join("\n")}`
-  }
-  prompt += `\n\n# User Message:\n${messageText}`
-  const response = await generatePromptResponse(prompt);
-
-  // create the response message
-  await createMessage(chatId, response.response, null);
-
-  // summarize the chat when the first 6 messages were sent back and forth
-  if (history.length === 6) {
-    let prompt = `${agents['summarize']}`;
-    prompt += `\n\n# Chat History (Chronological):`
-    prompt += `\n${history.map((h) => `[${h.created_at}] ${h.user_id ? "User" : "Assistant"}: ${h.content}`).join("\n")}`
-
-    const summary = await generatePromptResponse(prompt);
-    await updateChatDescription(chatId, summary.response);
-  }
-
-  // count the uncompressed messages, the chat has a field called last_uncompressed_message_id
-  // that points to the last message that was not yet compressed
-  const uncompressedMessages = await db.prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_id = ? AND user_id IS NOT NULL AND id >= ?").get(chatId, chat.last_uncompressed_message_id || 0) as { count: number };
-
-  // the number of messages that will be compressed
-  const messagesToCompressCount = 20;
-  // the number of uncompressed messages that will trigger compression
-  const compressionThreshold = 50;
-  if (uncompressedMessages.count > compressionThreshold) {
-    const messagesToCompress = history.slice(0, messagesToCompressCount); // Keep last 10 messages uncompressed
-    const startTime = messagesToCompress[0].created_at;
-    const endTime = messagesToCompress[messagesToCompress.length - 1].created_at;
-    // for an array of x messages, [1, 2, ... x], we take the first n messages
-    // [1, 2, ... n] (index 0 to n-1), so the n-th index is the last uncompressed message
-    const lastUncompressedMessageId = history[messagesToCompressCount].id;
-
-    for (const message of messagesToCompress) {
-      console.log("Compressing message:", message);
-    }
-
-    let prompt = `${agents['compress']}`;
-    prompt += `\n\n# Chat History (Chronological, partial):`
-    prompt += `\n${messagesToCompress.map((h) => `[${h.created_at}] ${h.user_id ? "User" : "Assistant"}: ${h.content}`).join("\n")}`
-
-    const compressedSummary = await generatePromptResponse(prompt);
-
-    await createCompressedChat(
-      chatId,
-      startTime,
-      endTime,
-      compressedSummary.response,
-      messagesToCompress.length
-    );
-
-    // Update the last_uncompressed_message_id in chats
-    await db
-      .prepare(
-        "UPDATE chats SET last_uncompressed_message_id = ? WHERE id = ?"
-      )
-      .run(lastUncompressedMessageId, chatId);
-  }
+  const tokenCount = await executeAgentChain(chain, messageText);
 
   return {
-    response,
-    tokenCount: response.tokenCount,
-    learnedKnowledge,
+    result: chain.progress.get(`process_message`)?.result as string,
+    tokenCount,
     chatId,
   };
-}
-
-export interface Message {
-  id: number;
-  chat_id: number;
-  content: string;
-  user_id: number | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export async function getMessages(chatId: number, offset: number = 0, limit: number = 10) {
@@ -295,7 +243,7 @@ export async function loadChatMessages(chatId: number): Promise<Message[]> {
 
   // Merge and sort all messages by timestamp
   return [...compressedMessages, ...activeMessages].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    (a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime()
   );
 }
 
@@ -377,15 +325,6 @@ export async function deleteKnowledge(knowledgeId: number) {
     .run(knowledgeId);
 }
 
-export interface Knowledge {
-  id: number;
-  knowledge_base_id: number;
-  knowledge: string;
-  source: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CompressedChat {
   id: number;
   chat_id: number;
@@ -416,4 +355,10 @@ export async function getCompressedChats(chatId: number): Promise<CompressedChat
     .prepare("SELECT * FROM compressed_chats WHERE chat_id = ? ORDER BY start_time ASC")
     .all(chatId);
   return compressedChats as CompressedChat[];
+}
+
+export async function updateChatLastUncompressedMessageId(chatId: number, lastUncompressedMessageId: number) {
+  return db
+    .prepare("UPDATE chats SET last_uncompressed_message_id = ? WHERE id = ?")
+    .run(lastUncompressedMessageId, chatId);
 }
