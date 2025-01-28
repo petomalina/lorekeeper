@@ -42,7 +42,7 @@ export default async function RootLayout({
       <NavbarSpacer />
       <NavbarSection>
         <NavbarItem href="/">
-          <Image src="/logo.png" alt="Logo" className="h-6 w-6" width={24} height={24} />
+          <Image src="/logo4.png" alt="Logo" className="h-6 w-6" width={24} height={24} />
         </NavbarItem>
       </NavbarSection>
     </Navbar>
