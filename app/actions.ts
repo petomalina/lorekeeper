@@ -134,7 +134,7 @@ export async function sendUserMessage(
 
   // construct the chain
   const parts = [];
-  if (shouldExtractKnowledge) {
+  if (shouldExtractKnowledge && knowledgeBaseId != 0) {
     parts.push(extractChainPart("extract"));
   }
   parts.push(summarizeChainPart("summarize", 6));
@@ -182,6 +182,7 @@ export async function sendUserMessage(
       await updateChatLastUncompressedMessageId(chatId, lastUncompressedMessageId);
     },
     createMessage: async (message: Message, type: "user" | "assistant" | "compressed") => {
+      console.log('createMessage', message, type);
       if (type === "compressed") {
         await createCompressedChat(chatId, message.created_at!, message.created_at!, message.content, message.messages_count!);
       } else {
