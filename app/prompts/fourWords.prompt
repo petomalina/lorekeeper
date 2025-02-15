@@ -1,0 +1,18 @@
+---
+model: googleai/gemini-1.5-flash
+input:
+  schema:
+    chat: string
+output:
+  schema:
+    heading: string
+---
+
+# Task
+Create a 4-word (maximum) chat heading that summarizes the user-assistant
+conversation. **Extract the key subject and intent of the conversation.** 
+Think: "What is this conversation *about*?" and "What does the *user want*?". 
+Use these extracted elements to form a concise and informative heading.
+
+# Input chat
+{{chat}}
